@@ -26,13 +26,15 @@ try {
   const workbookPath = 'data/nbs_tagging_sheet_v2.1.xlsx';
   const sheetName = 'tagging';
 
-  let triggerObj = {};
-  let slotObj = {};
-
   const data = readFile(path.join(__dirname, outputPath)) || readFile(path.join(__dirname, inputPath));
+  const triggerData = readFile(path.join(__dirname, triggerOutputPath));
+  const slotData = readFile(path.join(__dirname, slotOutputPath));
 
   if (data) {
     const content = JSON.parse(data);
+    const triggerContent = triggerData ? JSON.parse(triggerData) : {};
+    const slotContent = slotData ? JSON.parse(slotData) : {};
+
     const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
     let tags = [...new Set(rowData.map(x => x['app_tag']).filter(x => !!x).sort())];
 
@@ -47,7 +49,6 @@ try {
       
       for (let utterance of utterances) {        
         for (let trigger of triggers) {
-          // const triggerRegexp = new RegExp(`(?<!\\[)\\b${trigger}\\b(?!\\])`);
           const tmp = trigger.split(' ').join('\\]*\\s\\[*');
           const triggerRegexp = new RegExp(`\\[*\\b${tmp}\\b\\]*`, 'g');
 
@@ -55,8 +56,14 @@ try {
             utterance['original'] = utterance['original'].replace(triggerRegexp, matched => `[${matched}]`);
             const triggerKey = trigger.replace(' ', '-');
 
-            if (triggerObj[triggerKey] === undefined) {
-              triggerObj[triggerKey] = {
+            if (triggerContent[triggerKey] !== undefined) {
+              if (triggerContent[triggerKey].occurrence[tag] !== undefined) {
+                triggerContent[triggerKey].occurrence[tag] += 1;
+              } else {
+                triggerContent[triggerKey].occurrence[tag] = 1;
+              }
+            } else {
+              triggerContent[triggerKey] = {
                 type: 'trigger',
                 slotNoun: '',
                 synonim: false,
@@ -64,46 +71,35 @@ try {
                 occurrence: {}
               }
 
-              triggerObj[triggerKey].occurrence[tag] = 1;
-            } else {
-              if (triggerObj[triggerKey].occurrence !== undefined) {
-                if (triggerObj[triggerKey].occurrence[tag] !== undefined) {
-                  triggerObj[triggerKey].occurrence[tag] += 1;
-                } else {
-                  triggerObj[triggerKey].occurrence[tag] = 1;
-                }
-              }
+              triggerContent[triggerKey].occurrence[tag] = 1;
             }
           }
         }
         
         for (let slot of slots) {
-          // const slotRegexp = new RegExp(`(?<!\\<)\\b${slot}\\b(?!\\>)`);
           const tmp = slot.split(' ').join('\\>*\\s\\<*');
           const slotRegexp = new RegExp(`\\<*\\b${tmp}\\b\\>*`, 'g');
 
           if (slotRegexp.test(utterance['original'])) {
             utterance['original'] = utterance['original'].replace(slotRegexp, matched => `<${matched}>`);
             const slotKey = slot.replace(' ', '-');
-            
-            if (slotObj[slotKey] === undefined) {
-              slotObj[slotKey] = {
-                type: 'slot',
+
+            if (slotContent[slotKey] !== undefined) {
+              if (slotContent[slotKey].occurrence[tag] !== undefined) {
+                slotContent[slotKey].occurrence[tag] += 1;
+              } else {
+                slotContent[slotKey].occurrence[tag] = 1;
+              }
+            } else {
+              slotContent[slotKey] = {
+                type: 'trigger',
                 slotNoun: '',
                 synonim: false,
                 index: 0,
                 occurrence: {}
               }
 
-              slotObj[slotKey].occurrence[tag] = 1;
-            } else {
-              if (slotObj[slotKey].occurrence !== undefined) {
-                if (slotObj[slotKey].occurrence[tag] !== undefined) {
-                  slotObj[slotKey].occurrence[tag] += 1;
-                } else {
-                  slotObj[slotKey].occurrence[tag] = 1;
-                }
-              }
+              slotContent[slotKey].occurrence[tag] = 1;
             }
           }
         }
@@ -130,45 +126,17 @@ try {
         recursive: true
       });
     }
-
-    let triggerTmpObj = {};
-    let slotTmpObj = {};
-
-    const triggerData = readFile(path.join(__dirname, triggerOutputPath));
-    const slotData = readFile(path.join(__dirname, slotOutputPath));
     
-    if (triggerData) {
-      triggerTmpObj = {
-        ...triggerObj,
-        ...JSON.parse(triggerData)
-      }
-    } else {
-      triggerTmpObj = {
-        ...triggerObj
-      }
-    }
-
-    if (slotData) {
-      slotTmpObj = {
-        ...slotObj,
-        ...JSON.parse(slotData)
-      }
-    } else{
-      slotTmpObj = {
-        ...slotObj
-      }
-    }
-    
-    const orderedTriggers = Object.keys(triggerTmpObj).sort().reduce(
+    const orderedTriggers = Object.keys(triggerContent).sort().reduce(
       (item, key) => { 
-        item[key] = triggerTmpObj[key]; 
+        item[key] = triggerContent[key]; 
         return item;
       }, {}
     );
 
-    const orderedSlots = Object.keys(slotTmpObj).sort().reduce(
+    const orderedSlots = Object.keys(slotContent).sort().reduce(
       (item, key) => { 
-        item[key] = slotTmpObj[key]; 
+        item[key] = slotContent[key]; 
         return item;
       }, {}
     );

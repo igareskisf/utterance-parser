@@ -13,7 +13,6 @@ try {
   const blacklistTags = ['delete-delete', 'garbage-garbage', 'vague-vague'];
   const minWords = 2;
   const maxWords = 15;
-  // const idealLength = 8;
 
   let result = {};
   
@@ -54,25 +53,6 @@ try {
                         })
                         .filter(x => x['short'].split(' ').length >= minWords)
                         .sort((a, b) => a['short'].split(' ').length > b['short'].split(' ').length ? -1 : 1);
-
-      // if (transcripts.length > 1) {
-      //   for (let i = 0; i < transcripts.length - 1; i++) {
-      //     const shorter = transcripts[i]['short'].split(' ');
-          
-      //     for (let j = i + 1; j < transcripts.length; j++) {
-      //       const longer = transcripts[j]['short'].split(' ');
-            
-      //       let theOne = [transcripts[j], transcripts[i]].reduce((prev, curr) => Math.abs(curr['short'].split(' ').length - idealLength) < Math.abs(prev['short'].split(' ').length - idealLength) ? curr : prev);
-
-      //       if (result[tag].length === 0 || (shorter.filter(x => longer.includes(x)).length / shorter.length) < 0.5) {            
-      //         result[tag].push(theOne);
-      //         transcripts = transcripts.filter(x => x['short'] !== theOne['short']);
-      //       }          
-      //     }
-      //   }
-      // } else {
-      //   result[tag] = result[tag].concat(transcripts);
-      // }
                           
       for (let i = 0; i < transcripts.length - 1; i++) {
         const longer = transcripts[i]['short'].split(' ');

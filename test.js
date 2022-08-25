@@ -4,8 +4,6 @@
 
 try {
   const tag = 'test-tag';
-  // const idealLength = 8;
-
   let result = {};
   result[tag] = [];
 
