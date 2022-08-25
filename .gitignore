@@ -1,0 +1,4 @@
+node_modules
+tf-helper/destination
+output/*
+!output/words
