@@ -92,7 +92,7 @@ try {
               }
             } else {
               slotContent[slotKey] = {
-                type: 'trigger',
+                type: 'slot',
                 slotNoun: '',
                 synonim: false,
                 index: 0,

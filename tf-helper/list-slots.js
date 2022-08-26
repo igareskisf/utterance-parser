@@ -58,13 +58,13 @@ try {
     }
   }
 
-  if (!fs.existsSync(filepath)) {
-    fs.mkdirSync(filepath, {
+  if (!fs.existsSync(path.join(__dirname, filepath))) {
+    fs.mkdirSync(path.join(__dirname, filepath), {
       recursive: true
     });
   }
 
-  fs.writeFileSync(`${filepath}/${filename}`, JSON.stringify(resultObj, null, 2));
+  fs.writeFileSync(path.join(__dirname, `${filepath}/${filename}`), JSON.stringify(resultObj, null, 2));
 
   console.log('Done');
 } catch(e) {
