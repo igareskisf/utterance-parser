@@ -4,139 +4,78 @@
 
 const fs = require('fs');
 const path = require('path');
-const { xlsxParser } = require('./utils/file-helper');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const argv = yargs(hideBin(process.argv));
-const { checkLocationExists, readFile } = require('./utils/file-helper');
+const { checkLocationExists, readFile, makeDir } = require('./utils/file-helper');
 
 try {
-  const args = argv.array('trigger').array('slot').parse();
-  const tag = args.tag || null;
-  const triggers = [...new Set(args.trigger)] || [];
-  const slots = [...new Set(args.slot)] || [];
+  const args = argv
+                .demandOption('tag')
+                .demandOption('trigger')
+                .choices('type', ['action', 'noun'])
+                .default('type', 'noun')
+                .default('slot', 'unknown')
+                .default('parent', null)
+                .boolean('synonim')
+                .default('synonim', false).parse();
+
+  const tag = args.tag;
+  const trigger = args.trigger;
+  const type = args.type;
+  const slotUpper = args.slot.charAt(0).toUpperCase() + args.slot.slice(1);
+  const slot = type === 'action' ? `${slotUpper}Action` : `${slotUpper}Noun`;
+  const parent = args.parent;
+  const synonim = args.synonim;
   
   const inputDir = 'output/utterances';
-  const inputPath = `${inputDir}/utterances.json`;
+  const inputPath = `${inputDir}/${tag}.json`;
   const outputDir = 'output/marked-utterances';
-  const outputPath = `${outputDir}/marked-utterances.json`;
-  const triggerSlotOutputDir = 'output/slots-triggers';
-  const triggerOutputPath = `${triggerSlotOutputDir}/triggers.json`;
-  const slotOutputPath = `${triggerSlotOutputDir}/slots.json`;
-  const workbookPath = 'data/nbs_tagging_sheet_v2.1.xlsx';
-  const sheetName = 'tagging';
+  const outputPath = `${outputDir}/${tag}.json`;
+  const triggerOutputDir = 'output/triggers';
+  const triggerOutputPath = type === 'action' ? `${triggerOutputDir}/actions.json` : `${triggerOutputDir}/nouns.json`;
 
   const data = readFile(path.join(__dirname, outputPath)) || readFile(path.join(__dirname, inputPath));
-  const triggerData = readFile(path.join(__dirname, triggerOutputPath));
-  const slotData = readFile(path.join(__dirname, slotOutputPath));
 
   if (data) {
-    const content = JSON.parse(data);
+    const utterances = JSON.parse(data);
+    const triggerKey = trigger.replace(' ', '-');
+    const triggerData = readFile(path.join(__dirname, triggerOutputPath));
     const triggerContent = triggerData ? JSON.parse(triggerData) : {};
-    const slotContent = slotData ? JSON.parse(slotData) : {};
+    const triggerExtended = type === 'action' ? trigger.split(' ').join('\\]*\\s\\[*') : trigger.split(' ').join('\\>*\\s\\<*');
+    const triggerRegexp = type === 'action' ? new RegExp(`\\[*\\b${triggerExtended}\\b\\]*`, 'g') : new RegExp(`\\<*\\b${triggerExtended}\\b\\>*`, 'g');
 
-    const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
-    let tags = [...new Set(rowData.map(x => x['app_tag']).filter(x => !!x).sort())];
-
-    if (tag) {
-      tags = tags.filter(x => x === tag);
-    }
-
-    for (let tag of tags) {
-      const utterances = content[tag] || [];
-
-      let replaced = [];
-      
-      for (let utterance of utterances) {        
-        for (let trigger of triggers) {
-          const tmp = trigger.split(' ').join('\\]*\\s\\[*');
-          const triggerRegexp = new RegExp(`\\[*\\b${tmp}\\b\\]*`, 'g');
-
-          if (triggerRegexp.test(utterance['original'])) {
-            utterance['original'] = utterance['original'].replace(triggerRegexp, matched => `[${matched}]`);
-            const triggerKey = trigger.replace(' ', '-');
-
-            if (triggerContent[triggerKey] !== undefined) {
-              if (triggerContent[triggerKey].occurrence[tag] !== undefined) {
-                triggerContent[triggerKey].occurrence[tag] += 1;
-              } else {
-                triggerContent[triggerKey].occurrence[tag] = 1;
-              }
-            } else {
-              triggerContent[triggerKey] = {
-                type: 'trigger',
-                slotNoun: '',
-                synonim: false,
-                index: 0,
-                occurrence: {}
-              }
-
-              triggerContent[triggerKey].occurrence[tag] = 1;
-            }
-          }
-        }
+    let tagCounter = 0;
         
-        for (let slot of slots) {
-          const tmp = slot.split(' ').join('\\>*\\s\\<*');
-          const slotRegexp = new RegExp(`\\<*\\b${tmp}\\b\\>*`, 'g');
+    for (let utterance of utterances) {
+      utterance['placeholder'] = utterance['placeholder'] || utterance['original'];
 
-          if (slotRegexp.test(utterance['original'])) {
-            utterance['original'] = utterance['original'].replace(slotRegexp, matched => `<${matched}>`);
-            const slotKey = slot.replace(' ', '-');
-
-            if (slotContent[slotKey] !== undefined) {
-              if (slotContent[slotKey].occurrence[tag] !== undefined) {
-                slotContent[slotKey].occurrence[tag] += 1;
-              } else {
-                slotContent[slotKey].occurrence[tag] = 1;
-              }
-            } else {
-              slotContent[slotKey] = {
-                type: 'slot',
-                slotNoun: '',
-                synonim: false,
-                index: 0,
-                occurrence: {}
-              }
-
-              slotContent[slotKey].occurrence[tag] = 1;
-            }
-          }
-        }
-
-        replaced.push({
-          original: utterance['original'],
-          short: utterance['short']
-        });
+      if (triggerRegexp.test(utterance['placeholder'])) {
+        tagCounter += 1;
+        utterance['placeholder'] = utterance['placeholder'].replace(triggerRegexp, matched => type === 'action' ? `[${matched}]` : `<${matched}>`);
       }
-
-      content[tag] = replaced;
     }
 
-    if (!checkLocationExists(outputDir)) {
-      fs.mkdirSync(outputDir, {
-        recursive: true
-      });
+    if (!triggerContent[triggerKey]) {
+      triggerContent[triggerKey] = {
+        type,
+        slot,
+        synonim,
+        parent,
+        occurrence: {}
+      };
     }
 
-    fs.writeFileSync(outputPath, JSON.stringify(content, null, 2));
 
-    if (!checkLocationExists(triggerSlotOutputDir)) {
-      fs.mkdirSync(triggerSlotOutputDir, {
-        recursive: true
-      });
+    triggerContent[triggerKey].occurrence[tag] = tagCounter;
+
+    if (!checkLocationExists(triggerOutputDir)) {
+      makeDir(triggerOutputDir);
     }
-    
+
     const orderedTriggers = Object.keys(triggerContent).sort().reduce(
       (item, key) => { 
         item[key] = triggerContent[key]; 
-        return item;
-      }, {}
-    );
-
-    const orderedSlots = Object.keys(slotContent).sort().reduce(
-      (item, key) => { 
-        item[key] = slotContent[key]; 
         return item;
       }, {}
     );
@@ -145,19 +84,14 @@ try {
       value.occurrence = Object.entries(value.occurrence).sort(([,a], [,b]) => b - a).reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
     }
 
-    for (const [key, value] of Object.entries(orderedSlots)) {
-      value.occurrence = Object.entries(value.occurrence).sort(([,a], [,b]) => b - a).reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
-    }
-
-    if (!checkLocationExists(triggerSlotOutputDir)) {
-      fs.mkdirSync(triggerSlotOutputDir, {
-        recursive: true
-      });
-    }
-
     fs.writeFileSync(triggerOutputPath, JSON.stringify(orderedTriggers, null, 2));
-    fs.writeFileSync(slotOutputPath, JSON.stringify(orderedSlots, null, 2));
 
+    if (!checkLocationExists(outputDir)) {
+      makeDir(outputDir);
+    }
+
+    fs.writeFileSync(outputPath, JSON.stringify(utterances, null, 2));
+    
     console.log('Done');
   } else {
     console.log(`${inputPath} and ${outputPath} do not exist`);

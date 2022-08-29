@@ -2,35 +2,69 @@
  * Lists generated utterances min and max counts
  */
 
-const { readFile } = require('./utils/file-helper');
+const path = require('path');
+const { checkLocationExists, readFile, xlsxParser } = require('./utils/file-helper');
 
 try {
-  const filepath = 'output/utterances/utterances.json';
+  const pathdir = 'output/utterances';
+  const workbookPath = 'data/nbs_tagging_sheet_v2.1.xlsx';
+  const sheetName = 'tagging';
   const blacklistTags = ['delete-delete', 'garbage-garbage', 'vague-vague'];
-  
-  const content = readFile(filepath);
 
-  if (content) {
-    const data = JSON.parse(content);
-    const filtered = Object.keys(data).filter(key => !blacklistTags.includes(key)).map(key => [key, data[key]]);
+  let minObj = {
+    size: 1,
+    tags: []
+  };
 
-    const min = filtered.sort((a, b) => a[1].length > b[1].length ? 1 : -1).filter(x => x[1].length === filtered[0][1].length);
-    const max = filtered.sort((a, b) => a[1].length > b[1].length ? -1 : 1).filter(x => x[1].length === filtered[0][1].length);
+  let maxObj = {
+    size: 1,
+    tags: []
+  };
+
+  if (checkLocationExists(path.join(__dirname, pathdir))) {
+    const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
+    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !!x && !blacklistTags.includes(x)).sort();
+
+    for (let tag of tags) {
+      const filepath = `${pathdir}/${tag}.json`;
+      const content = readFile(filepath);
+
+      if (content) {
+        const data = JSON.parse(content);
+        const size = data.length;
+
+        if (size < minObj.size) {
+          minObj.size =  size;
+          minObj.tags = [tag];
+        } else if (size === minObj.size) {
+          minObj.tags.push(tag);
+        }
+
+        if (size > maxObj.size) {
+          maxObj.size =  size;
+          maxObj.tags = [tag];
+        } else if (size === maxObj.size) {
+          maxObj.tags.push(tag);
+        }
+      } else {
+        console.log(`${filepath} does not exist`);
+      }
+    }
 
     const result = {
       min: {
-        tag: min.map(x => x[0]).sort(),
-        length: min[0][1].length
+        tag: minObj.tags.sort(),
+        length: minObj.size
       },
       max: {
-        tag: max.map(x => x[0]).sort(),
-        length: max[0][1].length
+        tag: maxObj.tags.sort(),
+        length: maxObj.size
       }
     }
 
     console.log(result);
   } else {
-    console.log(`${filepath} does not exist`);
+    console.log(`${pathdir} does not exist`);
   }
 } catch(e) {
   console.error(e);

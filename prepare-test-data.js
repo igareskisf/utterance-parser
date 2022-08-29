@@ -19,7 +19,7 @@ try {
   if (data) {
     const blacklist = JSON.parse(data);
     const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
-    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !blacklistTags.includes(x)).sort();
+    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !!x && !blacklistTags.includes(x)).sort();
     
     if (makeDir(outputDir)) {
       console.log(`${outputDir} created`);

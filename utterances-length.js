@@ -3,33 +3,37 @@
  * Lists generated utterances count by tag and the total count
  */
 
-const { readFile } = require('./utils/file-helper');
+const path = require('path');
+const { checkLocationExists, readFile, xlsxParser } = require('./utils/file-helper');
 
 try {
-  const filepath = 'output/utterances/utterances.json';
+  const pathdir = 'output/utterances';
+  const workbookPath = 'data/nbs_tagging_sheet_v2.1.xlsx';
+  const sheetName = 'tagging';
   const blacklistTags = ['delete-delete', 'garbage-garbage', 'vague-vague'];
-  
-  const content = readFile(filepath);
 
-  if (content) {
-    const data = JSON.parse(content);
-    const filtered = Object.keys(data)
-                    .filter(key => !blacklistTags.includes(key))
-                    .map(key => [key, data[key]])
-                    .sort((a, b) => a[1].length - b[1].length || 0);
+  let total = 0;
 
-    const result = {};
-    let total = 0;
+  if (checkLocationExists(path.join(__dirname, pathdir))) {
+    const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
+    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !!x && !blacklistTags.includes(x)).sort();
 
-    for (let item of filtered) {
-      result[item[0]] = item[1].length;
-      total += item[1].length;
+    for (let tag of tags) {
+      const filepath = `${pathdir}/${tag}.json`;
+      const content = readFile(filepath);
+
+      if (content) {
+        const data = JSON.parse(content);
+        total += data.length;
+        console.log(`${tag}: ${data.length}`);
+      } else {
+        console.log(`${filepath} does not exist`);
+      }
     }
 
-    console.log(result);
-    console.log(total);
+    console.log(`\nTotal: ${total}`);
   } else {
-    console.log(`${filepath} does not exist`);
+    console.log(`${pathdir} does not exist`);
   }
 } catch(e) {
   console.error(e);

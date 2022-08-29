@@ -3,7 +3,7 @@
 */
 
 const path = require('path');
-const { makeDir, createFile, readFile, xlsxParser } = require('./utils/file-helper');
+const { checkLocationExists, makeDir, createFile, readFile, xlsxParser } = require('./utils/file-helper');
 
 try {
   const outputDir = 'output/utterances';
@@ -13,23 +13,24 @@ try {
   const blacklistTags = ['delete-delete', 'garbage-garbage', 'vague-vague'];
   const minWords = 2;
   const maxWords = 15;
-
-  let result = {};
   
   const data = readFile(path.join(__dirname, wordsPath));
 
   if (data) {
     const blacklist = JSON.parse(data);
     const rowData = xlsxParser(path.join(__dirname, workbookPath), sheetName);
-    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !blacklistTags.includes(x)).sort();
+    const tags = [...new Set(rowData.map(x => x['app_tag']))].filter(x => !!x && !blacklistTags.includes(x)).sort();
 
     console.log('Total utterances:', rowData.map(x => x['transcription']).filter(x => !!x).length);
+
+    if (!checkLocationExists(outputDir)) {
+      makeDir(outputDir);
+    }
 
     for (let tag of tags) {
       if (tag === undefined) continue;
 
       let unique = new Set();
-      result[tag] = [];
 
       let transcripts = rowData
                         .filter(x => x['app_tag'] === tag && !!x['transcription'] && x['transcription'].split(' ').length <= maxWords)
@@ -71,19 +72,13 @@ try {
         }
       }
       
-      result[tag] = result[tag].concat(transcripts);
-    }
+      const filename = `${outputDir}/${tag}.json`;
 
-    if (makeDir(outputDir)) {
-      const filename = `${outputDir}/utterances.json`;
-
-      if (createFile(path.join(__dirname, filename), JSON.stringify(result, null, 2))) {
-        console.log(Object.keys(result).length);
+      if (createFile(path.join(__dirname, filename), JSON.stringify(transcripts, null, 2))) {
+        console.log(`${filename}: ${transcripts.length}`);
       } else {
         console.log(`${filename} already exists`);
       }
-    } else {
-      console.log(`${outputDir} already exists`);
     }
   } else {
     console.log(`${wordsPath} does not exist`);
