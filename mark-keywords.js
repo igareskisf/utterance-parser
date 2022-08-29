@@ -23,8 +23,7 @@ try {
   const tag = args.tag;
   const trigger = args.trigger;
   const type = args.type;
-  const slotUpper = args.slot.charAt(0).toUpperCase() + args.slot.slice(1);
-  const slot = type === 'action' ? `${slotUpper}Action` : `${slotUpper}Noun`;
+  const slot = type === 'action' ? `${args.slot}Action` : `${args.slot}Noun`;
   const parent = args.parent;
   const synonim = args.synonim;
   
