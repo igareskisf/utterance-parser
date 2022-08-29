@@ -19,10 +19,6 @@ try {
                 .default('parent', null)
                 .boolean('synonim')
                 .default('synonim', false)
-                .boolean('change')
-                .default('change', false)
-                .array('removals')
-                .default('removals', [])
                 .parse();
 
   const tag = args.tag;
@@ -32,8 +28,6 @@ try {
   const slot = type === 'action' ? `${slotUpper}Action` : `${slotUpper}Noun`;
   const parent = args.parent;
   const synonim = args.synonim;
-  const change = args.change;
-  const removals = args.removals;
   
   const inputDir = 'output/utterances';
   const inputPath = `${inputDir}/${tag}.json`;
@@ -47,6 +41,7 @@ try {
   if (data) {
     const utterances = JSON.parse(data);
     const triggerKey = trigger.replace(' ', '-');
+    const parentKey = parent ? parent.replace(' ', '-') : null;
     const triggerData = readFile(path.join(__dirname, triggerOutputPath));
     const triggerContent = triggerData ? JSON.parse(triggerData) : {};
     const triggerExtended = type === 'action' ? trigger.split(' ').join('\\]*\\s\\[*') : trigger.split(' ').join('\\>*\\s\\<*');
@@ -63,33 +58,30 @@ try {
       }
     }
 
-    if (!triggerContent[triggerKey]) {
-      triggerContent[triggerKey] = {
-        type,
-        slot,
-        synonim,
-        parent,
-        occurrence: {}
-      };
+    if (!synonim) {
+      if (!triggerContent[triggerKey]) {
+        triggerContent[triggerKey] = {
+          type,
+          slot,
+          occurrence: {},
+          synonims: {}
+        };
+      }
 
       triggerContent[triggerKey].occurrence[tag] = tagCounter;
     } else {
-      if (change) {
-        triggerContent[triggerKey].slot = slot;
-        triggerContent[triggerKey].synonim = synonim;
-        triggerContent[triggerKey].parent = parent;
-        triggerContent[triggerKey].occurrence = Object.keys(triggerContent[triggerKey].occurrence)
-                                                .filter(key => !removals.includes(key))
-                                                .reduce((obj, key) => {
-                                                  obj[key] === triggerContent[triggerKey].occurrence[key];
-                                                  return obj;
-                                                }, {});
-      } else {
-        triggerContent[triggerKey].occurrence[tag] = tagCounter;
+      if (!parentKey || !triggerContent[parentKey]) {
+        throw new Error('You cannot set a synonim for a non-existing trigger');
       }
-    }
 
-    
+      if (!triggerContent[parentKey].synonims[triggerKey]) {
+        triggerContent[parentKey].synonims[triggerKey] = {
+          occurrence: {}
+        };
+      }
+          
+      triggerContent[parentKey].synonims[triggerKey].occurrence[tag] = tagCounter;
+    }    
 
     if (!checkLocationExists(triggerOutputDir)) {
       makeDir(triggerOutputDir);
