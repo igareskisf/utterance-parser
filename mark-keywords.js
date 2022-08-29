@@ -40,11 +40,11 @@ try {
 
   if (data) {
     const utterances = JSON.parse(data);
-    const triggerKey = trigger.replace(' ', '-');
-    const parentKey = parent ? parent.replace(' ', '-') : null;
+    const triggerKey = trigger.replace(/\s/g, '-');
+    const parentKey = parent ? parent.replace(/\s/g, '-') : null;
     const triggerData = readFile(path.join(__dirname, triggerOutputPath));
     const triggerContent = triggerData ? JSON.parse(triggerData) : {};
-    const triggerExtended = type === 'action' ? trigger.split(' ').join('\\]*\\s\\[*') : trigger.split(' ').join('\\>*\\s\\<*');
+    const triggerExtended = type === 'action' ? trigger.split(' ').join('\\]*\[\\s\\w]*\\[*') : trigger.split(' ').join('\\>*[\\s\\w]*\\<*');
     const triggerRegexp = type === 'action' ? new RegExp(`\\[*\\b${triggerExtended}\\b\\]*`, 'g') : new RegExp(`\\<*\\b${triggerExtended}\\b\\>*`, 'g');
 
     let tagCounter = 0;

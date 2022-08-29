@@ -38,7 +38,7 @@ try {
     for (const item of data) {
       if (!item['Acceptable Nouns']) continue;
 
-      const tmp = item['Acceptable Nouns'].replace(',', '').split(' ').sort().join(' ');
+      const tmp = item['Acceptable Nouns'].replace(/,/g, '').split(' ').sort().join(' ');
 
       if (uniqueSlotValues.includes(tmp)) {
         duplicateSlotValues.push(item['Acceptable Nouns']);
