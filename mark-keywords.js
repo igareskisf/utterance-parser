@@ -18,14 +18,22 @@ try {
                 .default('slot', 'unknown')
                 .default('parent', null)
                 .boolean('synonim')
-                .default('synonim', false).parse();
+                .default('synonim', false)
+                .boolean('change')
+                .default('change', false)
+                .array('removals')
+                .default('removals', [])
+                .parse();
 
   const tag = args.tag;
   const trigger = args.trigger;
   const type = args.type;
-  const slot = type === 'action' ? `${args.slot}Action` : `${args.slot}Noun`;
+  const slotUpper = args.slot.charAt(0).toUpperCase() + args.slot.slice(1);
+  const slot = type === 'action' ? `${slotUpper}Action` : `${slotUpper}Noun`;
   const parent = args.parent;
   const synonim = args.synonim;
+  const change = args.change;
+  const removals = args.removals;
   
   const inputDir = 'output/utterances';
   const inputPath = `${inputDir}/${tag}.json`;
@@ -63,10 +71,25 @@ try {
         parent,
         occurrence: {}
       };
+
+      triggerContent[triggerKey].occurrence[tag] = tagCounter;
+    } else {
+      if (change) {
+        triggerContent[triggerKey].slot = slot;
+        triggerContent[triggerKey].synonim = synonim;
+        triggerContent[triggerKey].parent = parent;
+        triggerContent[triggerKey].occurrence = Object.keys(triggerContent[triggerKey].occurrence)
+                                                .filter(key => !removals.includes(key))
+                                                .reduce((obj, key) => {
+                                                  obj[key] === triggerContent[triggerKey].occurrence[key];
+                                                  return obj;
+                                                }, {});
+      } else {
+        triggerContent[triggerKey].occurrence[tag] = tagCounter;
+      }
     }
 
-
-    triggerContent[triggerKey].occurrence[tag] = tagCounter;
+    
 
     if (!checkLocationExists(triggerOutputDir)) {
       makeDir(triggerOutputDir);
@@ -82,7 +105,7 @@ try {
     for (const [key, value] of Object.entries(orderedTriggers)) {
       value.occurrence = Object.entries(value.occurrence).sort(([,a], [,b]) => b - a).reduce((r, [k, v]) => ({ ...r, [k]: v }), {});
     }
-
+    
     fs.writeFileSync(triggerOutputPath, JSON.stringify(orderedTriggers, null, 2));
 
     if (!checkLocationExists(outputDir)) {
